@@ -717,6 +717,13 @@ private:
   Error err_;
 };
 
+struct ClientOptions {
+  Headers headers;
+  Progress progress;
+  ResponseHandler response_handler;
+  ContentReceiver content_receiver;
+};
+
 class ClientImpl {
 public:
   explicit ClientImpl(const std::string &host);
@@ -730,6 +737,8 @@ public:
   virtual ~ClientImpl();
 
   virtual bool is_valid() const;
+
+  Result Get2(std::string_view path, ClientOptions options);
 
   Result Get(const char *path);
   Result Get(const char *path, const Headers &headers);
@@ -965,6 +974,8 @@ public:
   ~Client();
 
   bool is_valid() const;
+
+  Result Get2(std::string_view path, ClientOptions options);
 
   Result Get(const char *path);
   Result Get(const char *path, const Headers &headers);
@@ -5106,6 +5117,13 @@ ClientImpl::process_socket(Socket &socket,
 
 inline bool ClientImpl::is_ssl() const { return false; }
 
+inline Result ClientImpl::Get2(std::string_view path, ClientOptions options) {
+  auto path2 = std::string(path);
+  return Get(path2.c_str(), std::move(options.headers),
+             std::move(options.response_handler),
+             std::move(options.content_receiver), std::move(options.progress));
+}
+
 inline Result ClientImpl::Get(const char *path) {
   return Get(path, Headers(), Progress());
 }
@@ -5844,7 +5862,7 @@ inline void SSLClient::set_ca_cert_path(const char *ca_cert_file_path,
 
 inline void SSLClient::set_ca_cert_store(X509_STORE *ca_cert_store) {
   if (ca_cert_store) {
-    if(ctx_) {
+    if (ctx_) {
       if (SSL_CTX_get_cert_store(ctx_) != ca_cert_store) {
         // Free memory allocated for old cert and use new store `ca_cert_store`
         SSL_CTX_set_cert_store(ctx_, ca_cert_store);
@@ -6203,6 +6221,10 @@ inline Client::~Client() {}
 
 inline bool Client::is_valid() const {
   return cli_ != nullptr && cli_->is_valid();
+}
+
+inline Result Client::Get2(std::string_view path, ClientOptions options) {
+  return cli_->Get2(path, options);
 }
 
 inline Result Client::Get(const char *path) { return cli_->Get(path); }

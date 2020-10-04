@@ -3443,4 +3443,57 @@ TEST(HttpsToHttpRedirectTest2, SimpleInterface) {
   EXPECT_EQ(200, res->status);
 }
 #endif
+
+/**
+ * C++17 Interface Examples
+ */
+
+TEST(ChunkedEncodingTest, Cpp17_WithResponseHandlerAndContentReceiver) {
+  auto host = "www.httpwatch.com";
+
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+  auto port = 443;
+  SSLClient cli(host, port);
+#else
+  auto port = 80;
+  Client cli(host, port);
+#endif
+  cli.set_connection_timeout(2);
+
+  std::string path =
+      "/httpgallery/chunked/chunkedimage.aspx?0.4153841143030137";
+
+  std::string body;
+  auto res = cli.Get2(path, {.response_handler =
+                                 [&](const Response &response) {
+                                   EXPECT_EQ(200, response.status);
+                                   return true;
+                                 },
+                             .content_receiver =
+                                 [&](const char *data, size_t data_length) {
+                                   body.append(data, data_length);
+                                   return true;
+                                 }});
+  ASSERT_TRUE(res);
+
+  std::string out;
+  detail::read_file("./image.jpg", out);
+
+  EXPECT_EQ(200, res->status);
+  EXPECT_EQ(out, body);
+}
+
+TEST(DecodeWithChunkedEncoding, Cpp17_BrotliEncoding) {
+  Client cli("https://cdnjs.cloudflare.com");
+
+  const char *path = "/ajax/libs/jquery/3.5.1/jquery.js";
+
+  auto res = cli.Get2(path, {.headers = {{"Accept-Encoding", "brotli"}}});
+
+  ASSERT_TRUE(res);
+  EXPECT_EQ(200, res->status);
+  EXPECT_EQ(287630, res->body.size());
+  EXPECT_EQ("application/javascript; charset=utf-8",
+            res->get_header_value("Content-Type"));
+}
 #endif
